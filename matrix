@@ -1,0 +1,419 @@
+#!/bin/bash
+# Author: Martin Nguyen
+
+function dims(){
+# NAME
+#	dims - echos out the dimensions of a matrix
+# SYNOPSIS
+#	matrix dims MATRIX
+#	cat MATRIX | matrix dims
+# DESCRIPTION
+#	Outputs the rows and columns of the input matrix
+# AUTHOR
+#	Martin Nguyen
+
+# create temp file names
+datafilepath="datafilepath$$"
+
+# trap temp files
+trap "rm -f $datafilepath; echo 'ending script'; exit 1" INT HUP TERM
+
+# handle if matrix is coming from file or stdin
+# code was taken from hint #5 and is used multiple times throught the script
+if [ "$#" = "0" ]
+then
+	#echo "sees 0 argument"
+	cat > "$datafilepath"
+elif [ "$#" = "1" ]
+then
+	#echo "sees 1 arguments"
+	datafilepath=$1
+elif [ "$#" = "2" ] # error two arguments
+then
+	echo more than one argument 1>&2
+	exit 1
+fi
+
+# checking if readable
+if [ -r "$datafilepath" ]
+then
+	#echo "file readable"
+	# code for finding the number of rows and columns of a matrix was taken from code seen in class
+	rows=$(cat "$datafilepath" | wc -l)
+	columns=$(cat "$datafilepath" | head -n 1 | wc -w)
+	echo -e "$rows $columns"
+	executed=0 # variable to indicate successful operation
+else # catches if file is unreadable
+	echo "file unreadable" 1>&2
+	exit 1
+fi
+
+# if a temp file was created earlier remove it
+if [ "$#" = "0" ]
+then
+	rm $datafilepath
+fi
+
+# if function ran without error
+if [ "$executed" -eq "0" ]
+then
+	exit 0
+fi
+} # dims function end
+
+##################################################
+
+function transpose(){
+# NAME
+#	transpose
+# SYNOPSIS
+#	matrix transpose MATRIX
+#	cat MATRIX | matrix transpose
+# DESCRIPTION
+#	outputs the transpose of the given MxN matrix with dimensions NxM
+# AUTHOR
+#	Martin Nguyen
+
+# create temp file names
+tempMatrixPath="tempMatrix$$"
+#tempRowPath="tempRow$$"
+datafilepath="datafile$$"
+
+# trap temp files
+trap "rm -f $datafilepath $tempMatrixPath; echo 'ending script'; exit 1" INT HUP TERM
+
+# handle if matrix is comming from file or stdin
+if [ "$#" = "0" ]
+then
+	cat > "$datafilepath"
+elif [ "$#" = "1" ]
+then
+	datafilepath=$1
+elif [ "$#" = "2" ] # catches error if 2 arguments are sent
+then
+	echo more than 1 argument 1>&2
+	exit 1
+fi
+
+# checks if file is readable
+if [ -r "$datafilepath" ]
+then
+	# find number of columns
+	x=$(cat "$datafilepath" | head -n 1 | wc -w)
+	n=0
+	# iterate through all columns
+	while [[ ! $n -eq $x ]]
+	do
+		# transpose individual columns and append them to the temp matrix
+		n=$((n+1))
+		cut -f $n "$datafilepath" | tr '\n' '\t' >> "$tempMatrixPath"
+		# truncate extra tab left over from cut
+		truncate -s-1 "$tempMatrixPath"
+		# add newline to matrix
+		echo >> "$tempMatrixPath"
+	done
+	# output the transpose of the matrix
+	cat "$tempMatrixPath"
+	executed=0
+else # file was unreadable error handling
+	echo "file unreadable" 1>&2
+	exit 1
+fi
+
+# if a temp file was created earlier remove it
+if [ "$#" = "0" ]
+then
+	rm $datafilepath
+fi
+
+# remove tempMatrix
+rm $tempMatrixPath
+#rm $tempRow
+
+# if function ran without error
+if [ "$executed" -eq "0" ]
+then
+	exit 0
+fi
+} # transpose function end
+
+##################################################
+
+function mean(){
+# NAME
+#	mean
+# SYNOPSIS
+#	matrix mean MATRIX
+#	cat MATRIX | matrix mean
+# DESCRIPTION
+# 	outputs the mean vector of the matrix as a 1xN matrix
+# AUTHOR
+#	Martin Nguyen
+
+# create temp file names
+tempMatrixPath="tempMatrix$$"
+tempColumnPath="tempColumn$$"
+datafilepath="datafile$$"
+
+# trap temp files
+trap "rm -f $datafilepath $tempMatrixPath $tempColumnPath; echo 'ending script'; exit 1" INT HUP TERM
+
+# handle if matrix is comming from file or stdin
+if [ "$#" = "0" ]
+then
+	cat > "$datafilepath"
+elif [ "$#" = "1" ]
+then
+	datafilepath=$1
+elif [ "$#" = "2" ] # catches error if 2 arguments are sent
+then
+	echo more than 1 argument 1>&2
+	exit 1
+fi
+
+# checks if file is readable
+if [ -r "$datafilepath" ]
+then
+	# find number of columns
+	x=$(cat "$datafilepath" | head -n 1 | wc -w)
+	# find number of rows to divide by	
+	rows=$(cat "$datafilepath" | wc -l)
+	n=0
+	# iterate through all columns
+	while [[ ! $n -eq $x ]]
+	do
+		# increase n by 1
+		n=$((n+1))
+		# reset sum and mean for new column
+		sum=0
+		mean=0
+		# cut a column out from the matrix to work with
+		cut -f $n "$datafilepath" > "$tempColumnPath"
+		# iterate through column
+		while read num
+		do
+			# add another number to the sum
+			sum=`expr $sum + $num`
+			#echo $sum	
+		done < "$tempColumnPath" # insert the column into the while loop
+		# divide the sum by the rows
+		mean=$((($sum + ($rows / 2)*( ($sum>0) * 2-1 )) / $rows))
+		#echo "mean: $mean"
+		# add the mean and a tab character
+		echo -en "$mean\t" >> "$tempMatrixPath"
+	done
+	# truncate extra tab
+	truncate -s-1 "$tempMatrixPath"
+	# add new line to end matrix
+	echo >> "$tempMatrixPath"
+	# output the mean row vector
+	cat "$tempMatrixPath"
+	executed=0
+else # file was unreadable error handling
+	echo "file unreadable" 1>&2
+	exit 1
+fi
+
+# if a temp file was created earlier remove it
+if [ "$#" = "0" ]
+then
+	rm $datafilepath
+fi
+
+# remove temp files
+rm $tempMatrixPath
+rm $tempColumnPath
+
+# if function ran without error
+if [ "$executed" -eq "0" ]
+then
+	exit 0
+fi
+} # mean function end
+
+##################################################
+
+function add(){
+# NAME
+#	add
+# SYNOPSIS
+#	matrix add MATRIX1 MATRIX2
+# DESCRIPTION
+#	adds two matices of size MxN and outputs a matrix size MxN
+# AUTHOR
+#	Martin Nguyen
+
+# create temp file name
+tempMatrixPath="tempMatrix$$"
+
+# trap temp files
+trap "rm -f $tempMatrixPath; echo 'ending script'; exit 1" INT HUP TERM
+
+if [ ! "$#" = "2" ] # catches error if 2 arguments are not sent
+then
+	echo did not receive two matricies 1>&2
+	exit 1
+fi
+
+# checks if both arguments are readable
+if [[ -r "$1" && -r "$2" ]]
+then
+	# find the number of rows and columns for both matrices
+	rows1=$(cat "$1" | wc -l)
+	columns1=$(cat "$1" | head -n 1 | wc -w)
+
+	rows2=$(cat "$2" | wc -l)
+	columns2=$(cat "$2" | head -n 1 | wc -w)
+	
+	#echo -e "row1: $rows1\ncolumns1: $columns1\nrows2: $rows2\ncolumns2: $columns2"
+	
+	# checks if number of rows and columns are the same
+	if [[ $rows1 -eq $rows2 && $columns1 -eq $columns2 ]]
+	then
+		# the number of columns and rows are the same
+		# iterate throught rows
+		while read row1 && read row2 <&3
+		do
+			# iterate through columns
+			n=0
+			while [[ ! $n -eq $columns1 ]]
+			do
+				n=$((n+1))
+				# cut nth number from row
+				num1=$(cut -f $n <<< "$row1")
+				num2=$(cut -f $n <<< "$row2")
+				# add two numbers
+				sum=$(( num1 + num2 ))
+				#echo -e "num1: $num1\nnum2: $num2"
+				#echo "sum: $sum"
+				# append sum and tab to temp matrix
+				echo -en "$sum\t" >> "$tempMatrixPath"
+			done
+			# truncate extra tab
+			truncate -s-1 "$tempMatrixPath"
+			# append new line
+			echo >> "$tempMatrixPath"
+		done < $1 3<$2
+		# output matrix addition
+		cat "$tempMatrixPath"
+	else # if rows and columns do not match up
+		echo the rows and columns do not match up 1>&2
+		exit 1
+	fi	
+	executed=0
+else # if one or more files are unreadable
+	echo one or more files are unreadable 1>&2
+	exit 1
+fi
+
+# remove temp files
+rm $tempMatrixPath
+
+# if function ran without error
+if [ "$executed" -eq "0" ]
+then
+	exit 0
+fi
+
+} # add function end
+
+##################################################
+
+function multiply(){
+# NAME
+#	multiply
+# SYNOPSIS
+#	matrix multiply MATRIX1 MATRIX2
+# DESCRIPTION
+#	output the product of Matrix1 and Matrix2
+#	the function does the operation M1 x M2
+# AUTHOR
+#	Martin Nguyen
+
+# Create temp file name
+tempMatrixPath="tempMatrix$$"
+
+# trap temp file
+trap "rm -f $tempMatrixPath; echo 'ending script'; exit 1" INT HUP TERM
+
+if [ ! "$#" = "2" ] # catches error if 2 arguments are not sent
+then
+	echo did not receive two matricies 1>&2
+	exit 1
+fi
+
+# checks if both arguments are readable
+if [[ -r "$1" && -r "$2" ]]
+then
+	# find number of rows and columns of matrices
+	rows1=$(cat "$1" | wc -l)
+	columns1=$(cat "$1" | head -n 1 | wc -w)
+
+	rows2=$(cat "$2" | wc -l)
+	columns2=$(cat "$2" | head -n 1 | wc -w)
+	
+	#echo -e "row1: $rows1\ncolumns1: $columns1\nrows2: $rows2\ncolumns2: $columns2"
+	
+	# checks if matrices are the right size to be multiplied
+	if [ $columns1 -eq $rows2 ]
+	then
+		#echo "the matrices can be multiplied"
+		# while loop reads a row of the first matrix at a time
+		while read row1 
+		do
+			#echo "in loop 1"
+			# changes the row into a column for easier processing later in a while read loop
+			# saves the transposed row into a variable
+			tempRow1=$(tr '\t' '\n' <<< "$row1")
+			#echo "tempRow1: $tempRow1"
+			# while loop iterates through all columns of the second matrix
+			n=0
+			while [[ ! "$n" -eq "$columns2" ]]
+			do
+				#echo "in loop 2"
+				n=$((n+1))
+				sum=0
+				# cut the nth column from second matrix and save it into a variable
+				tempColumn2=$(cut -f $n "$2")
+				#echo "tempColumn2: $tempColumn2"
+				# iterates through the row and column vectors and finds the dot product
+				while read num1 && read num2 <&3
+				do
+					#echo "in loop 3"
+					product=$(( $num1 * $num2 ))
+					sum=$(( $product + $sum ))
+					#echo -e "num1: $num1\nnum2: $num2\nproduct: $product\nsum: $sum"
+				done <<< "$tempRow1" 3<<< "$tempColumn2"
+				# appends the dot product onto the temp matrix file
+				echo -en "$sum\t" >> "$tempMatrixPath"
+			done
+			# truncates extra tab from previous loop
+			truncate -s-1 "$tempMatrixPath"
+			# adds a new line to the temp matrix
+			echo >> "$tempMatrixPath"
+		done <$1
+		# outputs the product of the two matrices
+		cat "$tempMatrixPath"
+		# variable signals that the function executed properly
+		executed=0
+	else # catches error if matrices cannot be multiplied
+		echo The matrices cannot by multiplied 1>&2
+		exit 1
+	fi	
+else # catch error if one ore more files are unreadable
+	echo one or more files are unreadable 1>&2
+	exit 1
+fi
+
+# remove temp matrix
+rm $tempMatrixPath
+
+# if function ran without error
+if [ "$executed" -eq "0" ]
+then
+	exit 0
+fi
+
+} # multiply function end
+
+$@
